@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Language Translation Tool</title>
+<style>
+  body { font-family: Arial, sans-serif; background: #f2f4f8; margin: 0; padding: 20px; }
+  .card { max-width: 700px; margin: 30px auto; background: #fff; padding: 24px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,.1); }
+  h1 { text-align: center; margin-top: 0; }
+  .row { display: flex; gap: 12px; margin-bottom: 14px; }
+  .row div { flex: 1; }
+  label { font-weight: bold; display: block; margin-bottom: 4px; }
+  select, textarea { width: 100%; padding: 10px; font-size: 16px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; }
+  textarea { height: 130px; resize: vertical; }
+  button { padding: 10px 18px; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; background: #2563eb; color: #fff; }
+  button.secondary { background: #64748b; }
+  #result { margin-top: 18px; padding: 14px; min-height: 60px; background: #eef2ff; border-radius: 8px; white-space: pre-wrap; font-size: 18px; }
+  .actions { margin-top: 10px; display: flex; gap: 10px; }
+  #status { color: #b91c1c; margin-top: 8px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>🌐 Language Translation Tool</h1>
+
+  <div class="row">
+    <div>
+      <label for="source">From</label>
+      <select id="source"></select>
+    </div>
+    <div>
+      <label for="target">To</label>
+      <select id="target"></select>
+    </div>
+  </div>
+
+  <label for="input">Enter text (max 500 characters)</label>
+  <textarea id="input" maxlength="500" placeholder="Enter here..."></textarea>
+
+  <div style="margin-top:12px;">
+    <button id="translateBtn">Translate</button>
+  </div>
+  <div id="status"></div>
+
+  <label style="margin-top:18px;">Translated text</label>
+  <div id="result"></div>
+
+  <div class="actions">
+    <button class="secondary" id="copyBtn">📋 Copy</button>
+    <button class="secondary" id="speakBtn">🔊 Listen</button>
+  </div>
+</div>
+
+<script>
+  const languages = {
+    en: "English", ur: "Urdu", ar: "Arabic", hi: "Hindi", fr: "French",
+    de: "German", es: "Spanish", it: "Italian", pt: "Portuguese", ru: "Russian",
+    tr: "Turkish", "zh-CN": "Chinese (Simplified)", ja: "Japanese", ko: "Korean",
+    fa: "Persian", bn: "Bengali", nl: "Dutch", id: "Indonesian"
+  };
+
+  const sourceSel = document.getElementById("source");
+  const targetSel = document.getElementById("target");
+  const statusEl = document.getElementById("status");
+  const resultEl = document.getElementById("result");
+
+  // Dropdowns bharna
+  sourceSel.add(new Option("Auto detect", "Autodetect"));
+  for (const [code, name] of Object.entries(languages)) {
+    sourceSel.add(new Option(name, code));
+    targetSel.add(new Option(name, code));
+  }
+  sourceSel.value = "en";
+  targetSel.value = "ur";
+
+  // Translate
+  document.getElementById("translateBtn").addEventListener("click", async () => {
+    const text = document.getElementById("input").value.trim();
+    statusEl.textContent = "";
+    if (!text) {
+      statusEl.textContent = "First enter your text...";
+      return;
+    }
+    if (sourceSel.value === targetSel.value) {
+      statusEl.textContent = "Please select different source and target languages...";
+      return;
+    }
+
+    resultEl.textContent = "Translating...";
+    const url = "https://api.mymemory.translated.net/get?q=" +
+      encodeURIComponent(text) + "&langpair=" +
+      encodeURIComponent(sourceSel.value + "|" + targetSel.value);
+
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.responseStatus === 200) {
+        resultEl.textContent = data.responseData.translatedText;
+      } else {
+        resultEl.textContent = "";
+        statusEl.textContent = "Error: " + data.responseDetails;
+      }
+    } catch (err) {
+      resultEl.textContent = "";
+      statusEl.textContent = "Translation failed. Please check yout internet connection.";
+    }
+  });
+
+  // Copy
+  document.getElementById("copyBtn").addEventListener("click", async () => {
+    const text = resultEl.textContent;
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      statusEl.style.color = "#15803d";
+      statusEl.textContent = "Text Copied!";
+    } catch (e) {
+      statusEl.style.color = "#b91c1c";
+      statusEl.textContent = "Text not copied";
+    }
+    setTimeout(() => { statusEl.textContent = ""; statusEl.style.color = "#b91c1c"; }, 2000);
+  });
+
+  // Text-to-speech
+  speechSynthesis.getVoices(); // voices pehle se load karne ke liye
+  speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices();
+
+  function showMsg(msg) {
+    statusEl.style.color = "#b91c1c";
+    statusEl.textContent = msg;
+    setTimeout(() => { statusEl.textContent = ""; }, 3000);
+  }
+
+  document.getElementById("speakBtn").addEventListener("click", () => {
+    const text = resultEl.textContent;
+    if (!text || text === "Translating...") return;
+    const lang = targetSel.value;
+    const base = lang.split("-")[0].toLowerCase();
+
+    // 1) Agar laptop mn is language ki awaaz installed hai to wahi use karein
+    const hasVoice = speechSynthesis.getVoices()
+      .some(v => v.lang.toLowerCase().startsWith(base));
+
+    if (hasVoice) {
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = lang;
+      utter.onerror = () => showMsg("Voice don't played");
+      speechSynthesis.cancel();
+      speechSynthesis.speak(utter);
+      return;
+    }
+
+    // 2) Warna online Google TTS (internet chahiye, max ~200 characters)
+    const url = "https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=" +
+      encodeURIComponent(lang) + "&q=" + encodeURIComponent(text.slice(0, 200));
+    const audio = new Audio(url);
+    audio.onerror = () => showMsg("Voice is not available for this language.");
+    audio.play().catch(() => showMsg("Voice is not available for this language."));
+  });
+</script>
+</body>
+</html>
