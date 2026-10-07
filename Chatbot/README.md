@@ -55,15 +55,15 @@ An internet connection is needed the first time to download the NLTK data.
 
 **Chat Interface**
 
-![Chat interface](screenshot1.png)
+![Chat interface](screenshot1.PNG)
 
 **Answering Questions**
 
-![Answering questions](screenshot2.png)
+![Answering questions](screenshot2.PNG)
 
 **Fallback Response**
 
-![Fallback response](screenshot3.png)
+![Fallback response](screenshot3.PNG)
 
 ## Customization
 To use a different topic, edit the `FAQS` list in `chatbot.py` with your own questions and answers.
